@@ -47,13 +47,15 @@ export const NEWS_THRESHOLDS: Record<string, number> = {
     'PEPE': 500_000
 };
 
-// --- NEW: FAIR VALUE & OVERHEAT ENGINE PARAMS ---
-export const FAIR_VALUE_PARAMS: Record<string, { floor: number; ceiling: number; baseBuy: number; baseSell: number; maxBoostUp: number; maxBoostDown: number }> = {
-  'BTC':  { floor: 0.40, ceiling: 2.2, baseBuy: 1.0, baseSell: 1.0, maxBoostUp: 0.06, maxBoostDown: 0.05 },
-  'ETH':  { floor: 0.30, ceiling: 2.5, baseBuy: 0.8, baseSell: 0.9, maxBoostUp: 0.08, maxBoostDown: 0.07 },
-  'SOL':  { floor: 0.25, ceiling: 3.0, baseBuy: 0.7, baseSell: 0.9, maxBoostUp: 0.10, maxBoostDown: 0.09 },
-  'DOGE': { floor: 0.20, ceiling: 4.0, baseBuy: 0.5, baseSell: 0.7, maxBoostUp: 0.12, maxBoostDown: 0.12 },
-  'PEPE': { floor: 0.10, ceiling: 5.0, baseBuy: 0.3, baseSell: 0.6, maxBoostUp: 0.15, maxBoostDown: 0.15 }
+// --- NEW: VALUE EVENT LOGIC PARAMS ---
+export const VALUE_PARAMS = {
+    UNDERVALUE_THRESHOLD: 0.45, // Price is 45% of fair value
+    OVERVALUE_THRESHOLD: 2.2,   // Price is 2.2x of fair value
+    TRIGGER_DAYS: 5,            // Must persist for 5 days to trigger event
+    MIN_DURATION_DAYS: 3,
+    MAX_DURATION_DAYS: 10,
+    RALLY_DAILY_BOOST: { min: 0.02, max: 0.06 }, // +2% to +6% per day bias
+    CRASH_DAILY_DROP: { min: 0.03, max: 0.08 }   // -3% to -8% per day bias
 };
 
 export const PHASE_FACTORS: Record<MarketPhase, { buy: number; sell: number }> = {
@@ -279,7 +281,9 @@ export const INITIAL_COINS: Coin[] = [
     openLeverageRisk: 0.1,
     overheatIndex: 0,
     currentFundingRate: 0.0001,
-    fundingExtremeDuration: 0
+    fundingExtremeDuration: 0,
+    minutesUndervalued: 0,
+    minutesOvervalued: 0
   },
   {
     id: 'ethereum',
@@ -303,7 +307,9 @@ export const INITIAL_COINS: Coin[] = [
     openLeverageRisk: 0.2,
     overheatIndex: 0,
     currentFundingRate: 0.0001,
-    fundingExtremeDuration: 0
+    fundingExtremeDuration: 0,
+    minutesUndervalued: 0,
+    minutesOvervalued: 0
   },
   {
     id: 'solana',
@@ -327,7 +333,9 @@ export const INITIAL_COINS: Coin[] = [
     openLeverageRisk: 0.3,
     overheatIndex: 0,
     currentFundingRate: 0.0002,
-    fundingExtremeDuration: 0
+    fundingExtremeDuration: 0,
+    minutesUndervalued: 0,
+    minutesOvervalued: 0
   },
   {
     id: 'doge',
@@ -351,7 +359,9 @@ export const INITIAL_COINS: Coin[] = [
     openLeverageRisk: 0.5,
     overheatIndex: 0,
     currentFundingRate: 0.0001,
-    fundingExtremeDuration: 0
+    fundingExtremeDuration: 0,
+    minutesUndervalued: 0,
+    minutesOvervalued: 0
   },
   {
     id: 'pepe',
@@ -375,7 +385,9 @@ export const INITIAL_COINS: Coin[] = [
     openLeverageRisk: 0.6,
     overheatIndex: 0,
     currentFundingRate: 0.0004,
-    fundingExtremeDuration: 0
+    fundingExtremeDuration: 0,
+    minutesUndervalued: 0,
+    minutesOvervalued: 0
   },
 ];
 

@@ -60,6 +60,12 @@ export interface ExecutionResult {
   filledLevels: OrderBookLevel[]; // For visualization or debugging
 }
 
+export interface TrendEvent {
+  type: 'RELIEF_RALLY' | 'OVERHEAT_CRASH';
+  remainingMinutes: number;
+  dailyChangePct: number; // The bias to apply per day (normalized to ticks)
+}
+
 export interface Coin {
   id: string;
   symbol: string;
@@ -82,8 +88,13 @@ export interface Coin {
   // Simulation State
   daysSinceLastParabolic: number;
   openLeverageRisk: number; // 0-1
-  overheatIndex: number; // New: 0 = Fair, >0 = Overvalued, <0 = Undervalued
+  overheatIndex: number; // Display only: 0 = Fair, >0 = Overvalued, <0 = Undervalued
   
+  // Value Logic State (Event Based)
+  minutesUndervalued: number;
+  minutesOvervalued: number;
+  activeTrendEvent?: TrendEvent;
+
   // Funding State
   currentFundingRate: number;
   fundingExtremeDuration: number; // How many hours it has been extreme

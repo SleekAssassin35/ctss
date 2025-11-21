@@ -1,6 +1,6 @@
 
-import { Coin, MarketState, CalendarEvent, FeedItem, FuturesPosition, FuturesType, TechnicalIndicators, Candle, TimeFrame, Entity, MiningFarm, NewsItem, SupportResistance, PatternResult, OrderBook, OrderBookLevel, ExecutionResult, PlayerState, Language, MiningMode } from '../types';
-import { INSTANT_NEWS_POOL, INSTANT_NEWS_POOL_TR, ENTITY_NAMES, MINING_EVENTS, RIG_TYPES, COIN_PROFILES, PHASE_PARAMS, PATTERN_DATASET, LIQUIDITY_PROFILES, WHALE_ORDER_STYLES, LEVERAGE_TIERS, DEFAULT_LEVERAGE_TIERS, FUNDING_BANDS, PRICE_CAPS, NEWS_THRESHOLDS, WHALE_NEWS_TEMPLATES, WHALE_NEWS_TEMPLATES_TR, MINING_MODES, LIQUIDITY_IMPACT_FACTORS, FAIR_VALUE_PARAMS, PHASE_FACTORS } from '../constants';
+import { Coin, MarketState, CalendarEvent, FeedItem, FuturesPosition, FuturesType, TechnicalIndicators, Candle, TimeFrame, Entity, MiningFarm, NewsItem, SupportResistance, PatternResult, OrderBook, OrderBookLevel, ExecutionResult, PlayerState, Language, MiningMode, TrendEvent } from '../types';
+import { INSTANT_NEWS_POOL, INSTANT_NEWS_POOL_TR, ENTITY_NAMES, MINING_EVENTS, RIG_TYPES, COIN_PROFILES, PHASE_PARAMS, PATTERN_DATASET, LIQUIDITY_PROFILES, WHALE_ORDER_STYLES, LEVERAGE_TIERS, DEFAULT_LEVERAGE_TIERS, FUNDING_BANDS, PRICE_CAPS, NEWS_THRESHOLDS, WHALE_NEWS_TEMPLATES, WHALE_NEWS_TEMPLATES_TR, MINING_MODES, LIQUIDITY_IMPACT_FACTORS, VALUE_PARAMS, PHASE_FACTORS } from '../constants';
 
 // --- Utility ---
 const gaussianRandom = (mean = 0, stdev = 1) => {
@@ -352,7 +352,7 @@ export const calculateCorrelatedMovements = (coins: Coin[], events: CalendarEven
     // BTC base return for this tick
     const btcFinalReturn = gaussianRandom((macroMean + marketState.newsSentimentBias) * fractionOfDay, macroSigma * Math.sqrt(fractionOfDay));
     
-    // Phase Factors for Value Buy/Sell strength
+    // Phase Factors for Value Buy/Sell strength (Used for Events)
     const phaseFactors = PHASE_FACTORS[marketState.phase];
 
     const newCoins = coins.map(coin => {
@@ -366,58 +366,72 @@ export const calculateCorrelatedMovements = (coins: Coin[], events: CalendarEven
         const noise = gaussianRandom(0, (macroSigma * Math.sqrt(fractionOfDay) * profile.beta) * 0.5);
         let totalReturn = betaMove + noise;
 
-        // 3. Value Buy / Sell Components (New Logic)
-        const fairValueParams = FAIR_VALUE_PARAMS[coin.symbol] || FAIR_VALUE_PARAMS['BTC'];
-        
-        const undervaluation = (newFairValue - coin.price) / newFairValue;
-        const overvaluation = (coin.price - newFairValue) / newFairValue;
-        
-        // Clamp indicators 0 to 1.5
-        const u = Math.max(0, Math.min(1.5, undervaluation));
-        const o = Math.max(0, Math.min(1.5, overvaluation));
-        
-        const valueBuyComponent = 
-            fairValueParams.baseBuy * 
-            phaseFactors.buy * 
-            Math.pow(u, 1.3) * 
-            (fairValueParams.maxBoostUp * fractionOfDay); // Normalized to tick
+        // 3. Value Logic State Machine (Check for Event Triggers)
+        let activeEvent = coin.activeTrendEvent ? { ...coin.activeTrendEvent } : undefined;
+        let minsUndervalued = coin.minutesUndervalued;
+        let minsOvervalued = coin.minutesOvervalued;
 
-        let valueSellComponent = 
-            fairValueParams.baseSell * 
-            phaseFactors.sell * 
-            Math.pow(o, 1.3) * 
-            (fairValueParams.maxBoostDown * fractionOfDay);
-        
-        valueSellComponent *= -1; // Downward force
+        const priceRatio = coin.price / newFairValue;
 
-        // Hard Floor Logic
-        const hardFloorPrice = newFairValue * fairValueParams.floor;
-        if (coin.price < hardFloorPrice) {
-             // Soften downside trend if any
-             if (totalReturn < 0) totalReturn *= 0.6;
-             // Boost buy back
-             totalReturn += valueBuyComponent * 1.8;
+        if (priceRatio < VALUE_PARAMS.UNDERVALUE_THRESHOLD) {
+            minsUndervalued += deltaMinutes;
+            minsOvervalued = 0;
+        } else if (priceRatio > VALUE_PARAMS.OVERVALUE_THRESHOLD) {
+            minsOvervalued += deltaMinutes;
+            minsUndervalued = 0;
         } else {
-             totalReturn += valueBuyComponent;
+            // Reset if back to normal range, or maybe decay slowly? 
+            // Simplest: Reset to require sustained pressure
+            minsUndervalued = Math.max(0, minsUndervalued - deltaMinutes);
+            minsOvervalued = Math.max(0, minsOvervalued - deltaMinutes);
         }
 
-        // Ceiling / Bubble Logic
-        const ceilingPrice = newFairValue * fairValueParams.ceiling;
-        if (coin.price > ceilingPrice) {
-             // Accelerate sell off
-             totalReturn += valueSellComponent * 2.0;
-        } else {
-             totalReturn += valueSellComponent;
+        const triggerMins = VALUE_PARAMS.TRIGGER_DAYS * 1440;
+
+        // Trigger Relief Rally
+        if (!activeEvent && minsUndervalued >= triggerMins) {
+            const durationDays = VALUE_PARAMS.MIN_DURATION_DAYS + Math.random() * (VALUE_PARAMS.MAX_DURATION_DAYS - VALUE_PARAMS.MIN_DURATION_DAYS);
+            const dailyBoost = VALUE_PARAMS.RALLY_DAILY_BOOST.min + Math.random() * (VALUE_PARAMS.RALLY_DAILY_BOOST.max - VALUE_PARAMS.RALLY_DAILY_BOOST.min);
+            
+            activeEvent = {
+                type: 'RELIEF_RALLY',
+                remainingMinutes: durationDays * 1440,
+                dailyChangePct: dailyBoost * phaseFactors.buy
+            };
+            minsUndervalued = 0; // Reset counter
         }
 
-        // 4. Fee Pressure Events (Micro-Corrections based on funding)
+        // Trigger Overheat Crash
+        if (!activeEvent && minsOvervalued >= triggerMins) {
+            const durationDays = VALUE_PARAMS.MIN_DURATION_DAYS + Math.random() * (VALUE_PARAMS.MAX_DURATION_DAYS - VALUE_PARAMS.MIN_DURATION_DAYS);
+            const dailyDrop = VALUE_PARAMS.CRASH_DAILY_DROP.min + Math.random() * (VALUE_PARAMS.CRASH_DAILY_DROP.max - VALUE_PARAMS.CRASH_DAILY_DROP.min);
+            
+            activeEvent = {
+                type: 'OVERHEAT_CRASH',
+                remainingMinutes: durationDays * 1440,
+                dailyChangePct: -dailyDrop * phaseFactors.sell // Negative for crash
+            };
+            minsOvervalued = 0; // Reset counter
+        }
+
+        // Apply Active Event Bias
+        if (activeEvent) {
+            // Normalized to this tick duration
+            const eventBias = activeEvent.dailyChangePct * fractionOfDay;
+            totalReturn += eventBias;
+
+            activeEvent.remainingMinutes -= deltaMinutes;
+            if (activeEvent.remainingMinutes <= 0) {
+                activeEvent = undefined;
+            }
+        }
+
+        // 4. Fee Pressure Events (Micro-Corrections based on funding) - Existing logic preserved
         const bands = FUNDING_BANDS[coin.symbol] || FUNDING_BANDS['BTC'];
         const midFunding = (bands.min + bands.max) / 2;
         const spread = (bands.max - bands.min) / 2;
         const pressureIndex = (coin.currentFundingRate - midFunding) / spread;
         
-        // If extreme pressure, small chance to trigger a correction event in this tick
-        // Chance per minute = 0.05% * excess pressure
         if (Math.abs(pressureIndex) > 1) {
              const excess = Math.abs(pressureIndex) - 1;
              const triggerChance = 0.0005 * excess * (deltaMinutes);
@@ -425,11 +439,11 @@ export const calculateCorrelatedMovements = (coins: Coin[], events: CalendarEven
              if (Math.random() < triggerChance) {
                   if (pressureIndex > 1) {
                       // Funding too positive -> Long squeeze -> Drop price
-                      const drop = -1 * (0.03 + Math.random() * 0.05); // -3% to -8%
+                      const drop = -1 * (0.03 + Math.random() * 0.05); 
                       totalReturn += drop;
                   } else {
                       // Funding too negative -> Short squeeze -> Pump price
-                      const pump = (0.03 + Math.random() * 0.05); // +3% to +8%
+                      const pump = (0.03 + Math.random() * 0.05); 
                       totalReturn += pump;
                   }
              }
@@ -460,7 +474,6 @@ export const calculateCorrelatedMovements = (coins: Coin[], events: CalendarEven
         if (newHistory.length > 1000) newHistory = newHistory.slice(-1000);
         
         // Calculate simple Overheat Index for UI display
-        // > 0 Overvalued, < 0 Undervalued
         const displayOverheat = (newPrice / newFairValue) - 1;
 
         return { 
@@ -468,6 +481,9 @@ export const calculateCorrelatedMovements = (coins: Coin[], events: CalendarEven
             price: newPrice, 
             intrinsicValue: newFairValue, // Update Fair Value
             overheatIndex: displayOverheat,
+            minutesUndervalued: minsUndervalued,
+            minutesOvervalued: minsOvervalued,
+            activeTrendEvent: activeEvent,
             change24h: ((newPrice - (newHistory[0]?.close || newPrice)) / (newHistory[0]?.close || 1)) * 100, 
             marketCap: newPrice * coin.circulatingSupply, 
             history: newHistory 
