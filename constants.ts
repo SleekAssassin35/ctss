@@ -1,5 +1,5 @@
 
-import { Coin, PlayerState, TimeFrame, VolatilityTag, PatternDefinition, CalendarEvent, LiquidityProfile, MarketPhase } from './types';
+import { Coin, PlayerState, TimeFrame, VolatilityTag, PatternDefinition, CalendarEvent, LiquidityProfile } from './types';
 
 export const HISTORY_DAYS = 90; 
 
@@ -47,36 +47,32 @@ export const NEWS_THRESHOLDS: Record<string, number> = {
     'PEPE': 500_000
 };
 
-// --- NEW: VALUE EVENT LOGIC PARAMS ---
-export const VALUE_PARAMS = {
-    UNDERVALUE_THRESHOLD: 0.45, // Price is 45% of fair value
-    OVERVALUE_THRESHOLD: 2.2,   // Price is 2.2x of fair value
-    TRIGGER_DAYS: 5,            // Must persist for 5 days to trigger event
-    MIN_DURATION_DAYS: 3,
-    MAX_DURATION_DAYS: 10,
-    RALLY_DAILY_BOOST: { min: 0.02, max: 0.06 }, // +2% to +6% per day bias
-    CRASH_DAILY_DROP: { min: 0.03, max: 0.08 }   // -3% to -8% per day bias
-};
-
-export const PHASE_FACTORS: Record<MarketPhase, { buy: number; sell: number }> = {
-  'ACCUMULATION': { buy: 1.0, sell: 0.4 },
-  'BULL_RUN':     { buy: 0.9, sell: 0.7 }, // In bull run, selling pressure increases slightly as price rises
-  'DISTRIBUTION': { buy: 0.5, sell: 1.0 }, // Top logic
-  'BEAR_MARKET':  { buy: 0.3, sell: 0.9 }
-};
-
-// --- FUNDING BANDS (New System) ---
-export const FUNDING_BANDS: Record<string, { min: number; max: number; hardCap: number }> = {
-  'BTC':  { min: -0.0003, max: 0.0003, hardCap: 0.0025 }, // 0.03% fair, 0.25% max
-  'ETH':  { min: -0.0005, max: 0.0005, hardCap: 0.0035 },
-  'SOL':  { min: -0.0008, max: 0.0008, hardCap: 0.0050 },
-  'DOGE': { min: -0.0010, max: 0.0010, hardCap: 0.0060 },
-  'PEPE': { min: -0.0015, max: 0.0015, hardCap: 0.0080 }
-};
-
 export const FUNDING_PARAMS = {
   INTERVAL_HOURS: 8,
-  LIMITS: FUNDING_BANDS // Mapped for backward compatibility if needed
+  // Limits where funding is considered "Extreme"
+  LIMITS: {
+    'BTC': 0.00025,  // 0.025%
+    'ETH': 0.00035,
+    'SOL': 0.00045,
+    'DOGE': 0.00060,
+    'PEPE': 0.00080
+  },
+  // Reaction when limit is breached (Wick Size)
+  WICK_IMPACT: {
+    'BTC': 0.035, // 3.5%
+    'ETH': 0.045,
+    'SOL': 0.05,
+    'DOGE': 0.06,
+    'PEPE': 0.07
+  },
+  // Micro pressure per hour if it stays extreme
+  PRESSURE_BIAS: {
+    'BTC': 0.004, // 0.4% per hour drift against trend
+    'ETH': 0.005,
+    'SOL': 0.006,
+    'DOGE': 0.007,
+    'PEPE': 0.008
+  }
 };
 
 export const FEED_THRESHOLDS = {
@@ -279,11 +275,8 @@ export const INITIAL_COINS: Coin[] = [
     consecutiveCandles: 0,
     daysSinceLastParabolic: 0,
     openLeverageRisk: 0.1,
-    overheatIndex: 0,
     currentFundingRate: 0.0001,
-    fundingExtremeDuration: 0,
-    minutesUndervalued: 0,
-    minutesOvervalued: 0
+    fundingExtremeDuration: 0
   },
   {
     id: 'ethereum',
@@ -305,11 +298,8 @@ export const INITIAL_COINS: Coin[] = [
     consecutiveCandles: 0,
     daysSinceLastParabolic: 0,
     openLeverageRisk: 0.2,
-    overheatIndex: 0,
     currentFundingRate: 0.0001,
-    fundingExtremeDuration: 0,
-    minutesUndervalued: 0,
-    minutesOvervalued: 0
+    fundingExtremeDuration: 0
   },
   {
     id: 'solana',
@@ -331,11 +321,8 @@ export const INITIAL_COINS: Coin[] = [
     consecutiveCandles: 0,
     daysSinceLastParabolic: 0,
     openLeverageRisk: 0.3,
-    overheatIndex: 0,
     currentFundingRate: 0.0002,
-    fundingExtremeDuration: 0,
-    minutesUndervalued: 0,
-    minutesOvervalued: 0
+    fundingExtremeDuration: 0
   },
   {
     id: 'doge',
@@ -357,11 +344,8 @@ export const INITIAL_COINS: Coin[] = [
     consecutiveCandles: 0,
     daysSinceLastParabolic: 0,
     openLeverageRisk: 0.5,
-    overheatIndex: 0,
     currentFundingRate: 0.0001,
-    fundingExtremeDuration: 0,
-    minutesUndervalued: 0,
-    minutesOvervalued: 0
+    fundingExtremeDuration: 0
   },
   {
     id: 'pepe',
@@ -383,11 +367,8 @@ export const INITIAL_COINS: Coin[] = [
     consecutiveCandles: 0,
     daysSinceLastParabolic: 0,
     openLeverageRisk: 0.6,
-    overheatIndex: 0,
     currentFundingRate: 0.0004,
-    fundingExtremeDuration: 0,
-    minutesUndervalued: 0,
-    minutesOvervalued: 0
+    fundingExtremeDuration: 0
   },
 ];
 

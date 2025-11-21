@@ -2,7 +2,7 @@
 import React from 'react';
 import { PlayerState, Coin, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Wallet, Building2, TrendingUp, PieChart, Thermometer } from 'lucide-react';
+import { Wallet, Building2, TrendingUp, PieChart } from 'lucide-react';
 import { formatNumber } from '../services/gameEngine';
 
 interface DashboardProps {
@@ -91,12 +91,6 @@ const Dashboard: React.FC<DashboardProps> = ({ player, coins, lang }) => {
                 const profit = currentValue - (item.amount * item.avgBuyPrice);
                 const profitPercent = (profit / (item.amount * item.avgBuyPrice)) * 100;
                 
-                const overheat = coin.overheatIndex;
-                let heatColor = 'text-slate-500';
-                if (overheat > 0.5) heatColor = 'text-rose-400 animate-pulse';
-                else if (overheat > 0.2) heatColor = 'text-amber-400';
-                else if (overheat < -0.2) heatColor = 'text-emerald-400';
-
                 return (
                   <div key={item.coinId} className="bg-slate-950 p-3 rounded-xl flex justify-between items-center">
                     <div className="flex items-center gap-3">
@@ -104,14 +98,7 @@ const Dashboard: React.FC<DashboardProps> = ({ player, coins, lang }) => {
                         {coin.symbol[0]}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                           <p className="font-bold text-slate-200">{coin.name}</p>
-                           {Math.abs(overheat) > 0.2 && (
-                               <span className={`text-[10px] flex items-center gap-0.5 ${heatColor}`} title="Overheat/Value Index">
-                                   <Thermometer size={10} /> {(overheat * 100).toFixed(0)}%
-                               </span>
-                           )}
-                        </div>
+                        <p className="font-bold text-slate-200">{coin.name}</p>
                         <p className="text-xs text-slate-500">{formatNumber(item.amount, lang)} {coin.symbol}</p>
                       </div>
                     </div>

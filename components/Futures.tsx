@@ -58,8 +58,7 @@ const Futures: React.FC<FuturesProps> = ({ coins, player, lang, onOpenPosition, 
   const priceImpact = calculatePriceImpact(selectedCoin.symbol, estimatedSize, selectedCoin.volume);
 
   const fundingRate = selectedCoin.currentFundingRate || 0;
-  const fundingBand = FUNDING_PARAMS.LIMITS[selectedCoin.symbol as keyof typeof FUNDING_PARAMS.LIMITS];
-  const fundingLimit = fundingBand ? Math.max(Math.abs(fundingBand.max), Math.abs(fundingBand.min)) : 0.0005;
+  const fundingLimit = FUNDING_PARAMS.LIMITS[selectedCoin.symbol as keyof typeof FUNDING_PARAMS.LIMITS] || 0.0005;
   const isFundingExtreme = Math.abs(fundingRate) > fundingLimit;
 
   const handleOpen = () => {
